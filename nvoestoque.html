@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque Completo v2</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f8; padding: 15px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
+        h1 { text-align: center; margin-bottom: 20px; }
+        nav { text-align: center; margin-bottom: 25px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+        button { padding: 10px 15px; font-size: 14px; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease; display: inline-flex; align-items: center; gap: 5px; }
+        button:hover { filter: brightness(1.1); }
+        input, select, textarea { margin: 8px 0; padding: 10px; font-size: 16px; width: calc(100% - 22px); border: 1px solid #bdc3c7; border-radius: 4px; box-sizing: border-box; }
+        textarea { resize: vertical; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #ecf0f1; font-weight: bold; }
+        .section { display: none; margin-top: 20px; animation: fadeIn 0.5s; }
+        .visible { display: block; }
+        .delete-btn { background-color: #e74c3c; }
+        .edit-btn { background-color: #f39c12; }
+        .save-btn { background-color: #2ecc71; }
+        .cancel-btn { background-color: #95a5a6; }
+        .categoria-btn { background-color: #9b59b6; margin-top: 5px; }
+        .linha-entrada, .linha-saida, .linha-retorno { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .linha-entrada span, .linha-saida span, .linha-retorno span { flex: 1; min-width: 150px; }
+        .linha-entrada input, .linha-saida input, .linha-retorno input { width: 80px; flex-grow: 0; }
+        .busca-container { margin: 15px 0; }
+        .invalid { border: 2px solid #e74c3c !important; }
+        .categoria-box { margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 5px; background: #fdfdfd; }
+        .mensagem { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; font-weight: bold; display: none; }
+        .mensagem.sucesso { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .mensagem.erro { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .mensagem.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .produto-editando td { background-color: #fffacd; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Controle de Estoque Integrado</h1>
+        <div id="areaMensagem" class="mensagem"></div>
+        <nav>
+            <button onclick="mostrarSecao('cadastroProduto')" style="background-color: #2ecc71;">➕ Cadastrar Produto</button>
+            <button onclick="mostrarSecao('entradaEstoque')" style="background-color: #3498db;">⬆️ Entrada Estoque</button>
+            <button onclick="mostrarSecao('cadastroMotorista')" style="background-color: #9b59b6;">🚚 Cadastrar Motorista</button>
+            <button onclick="mostrarSecao('categorias')" style="background-color: #8e44ad;">🗂️ Ver Categorias</button>
+            <button onclick="mostrarSecao('saidaEntrega')" style="background-color: #e74c3c;">⬇️ Saída p/ Entrega</button>
+            <button onclick="mostrarSecao('retornoEntrega')" style="background-color: #f39c12;">↩️ Retorno de Entrega</button>
+            <button onclick="mostrarSecao('visualizarEstoque')" style="background-color: #1abc9c;">👀 Visualizar Estoque</button>
+            <button onclick="mostrarSecao('estoqueTotal')" style="background-color: #34495e;">📊 Estoque Total</button>
+            <button onclick="mostrarSecao('controleEntregas')" style="background-color: #7f8c8d;">📋 Controle de Entregas</button>
+            <button onclick="mostrarSecao('visualizarMotoristas')" style="background-color: #5DADE2;">👥 Ver Motoristas</button>
+        </nav>
+        <div id="cadastroProduto" class="section">
+            <h2>➕ Cadastrar Novo Produto</h2>
+            <input id="produtoIdEditar" type="hidden">
+            <input id="nomeProduto" placeholder="Nome do Produto *" required>
+            <input id="quantidadeProduto" type="number" placeholder="Quantidade Inicial (ex: 100) *" min="0" required>
+            <select id="categoriaProduto">
+                <option value="">Selecione uma categoria existente</option>
+            </select>
+            <input id="novaCategoria" placeholder="Ou digite uma nova categoria aqui">
+            <button onclick="adicionarCategoria()" class="categoria-btn">➕ Criar Categoria</button>
+            <button onclick="salvarProduto()" class="save-btn" style="margin-top: 10px;">💾 Salvar Produto</button>
+            <button onclick="limparFormularioProduto()" class="cancel-btn" style="margin-top: 10px;">🧹 Limpar</button>
+        </div>
+        <div id="entradaEstoque" class="section">
+            <h2>⬆️ Registrar Entrada no Estoque</h2>
+            <label for="dataEntradaGeral">Data da Entrada:</label>
+            <input type="date" id="dataEntradaGeral">
+            <p>Informe a quantidade que entrou para cada produto:</p>
+            <div id="listaProdutosEntrada"></div>
+            <button onclick="salvarEntradas()" style="background-color: #3498db; margin-top: 10px;">💾 Salvar Entradas</button>
+        </div>
+        <div id="cadastroMotorista" class="section">
+            <h2>🚚 Cadastrar Novo Motorista</h2>
+            <input id="nomeMotorista" placeholder="Nome Completo *">
+            <input id="telefoneMotorista" placeholder="Telefone (Ex: (21) 99999-8888)">
+            <input id="veiculoMotorista" placeholder="Marca/Modelo/Placa do Veículo">
+            <button onclick="cadastrarMotorista()" style="background-color: #9b59b6;">✅ Registrar Motorista</button>
+        </div>
+         <div id="visualizarMotoristas" class="section">
+             <h2>👥 Motoristas Cadastrados</h2>
+             <div id="tabelaMotoristas"></div>
+        </div>
+        <div id="categorias" class="section">
+            <h2>🗂️ Produtos Agrupados por Categoria</h2>
+            <div id="listaCategorias"></div>
+        </div>
+        <div id="saidaEntrega" class="section">
+            <h2>⬇️ Registrar Saída para Entrega</h2>
+            <label for="dataSaida">Data da Saída:</label>
+            <input type="date" id="dataSaida" required>
+            <label for="motoristaSaida">Motorista Responsável:</label>
+            <select id="motoristaSaida" required>
+                <option value="">-- Selecione o Motorista --</option>
+            </select>
+            <p>Selecione os produtos e quantidades para a entrega:</p>
+            <div id="listaProdutosSaida"></div>
+            <button onclick="registrarSaidaEntrega()" style="background-color: #e74c3c; margin-top: 10px;">🚚 Registrar Saída</button>
+        </div>
+        <div id="retornoEntrega" class="section">
+            <h2>↩️ Registrar Retorno de Entrega</h2>
+            <p>Selecione uma entrega que saiu e informe as quantidades que retornaram ao estoque:</p>
+            <div id="listaEntregasParaRetorno"></div>
+            </div>
+        <div id="visualizarEstoque" class="section">
+            <h2>👀 Visualizar Estoque Atual</h2>
+            <div class="busca-container">
+                <input type="text" id="buscaProduto" placeholder="🔍 Buscar por nome ou categoria..." oninput="filtrarProdutos()">
+            </div>
+            <div id="tabelaEstoque"></div>
+        </div>
+        <div id="estoqueTotal" class="section">
+            <h2>📊 Estoque Total por Categoria</h2>
+            <div id="resumoEstoque"></div>
+        </div>
+        <div id="controleEntregas" class="section">
+            <h2>📋 Histórico e Controle de Entregas</h2>
+            <div id="listaControleEntregas"></div>
+        </div>
+    </div><script>
+        function mostrarMensagem(texto, tipo = 'info', tempo = 3000) {
+            const areaMsg = document.getElementById('areaMensagem');
+            areaMsg.textContent = texto;
+            areaMsg.className = `mensagem ${tipo}`;
+            areaMsg.style.display = 'block';
+            setTimeout(() => { areaMsg.style.display = 'none'; }, tempo);
+        }
+        function mostrarSecao(id) {
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('visible'));
+            const secaoAtiva = document.getElementById(id);
+             if(secaoAtiva) {
+                 secaoAtiva.classList.add('visible');
+                 if (id === 'cadastroProduto') { atualizarCategoriasSelect(); limparFormularioProduto(); }
+                 if (id === 'entradaEstoque') renderizarEntradaProdutos();
+                 if (id === 'visualizarEstoque') renderizarEstoque();
+                 if (id === 'estoqueTotal') renderizarResumoEstoque();
+                 if (id === 'controleEntregas') renderizarControleEntregas();
+                 if (id === 'categorias') renderizarPorCategoria();
+                 if (id === 'saidaEntrega') renderizarSaidaEntrega();
+                 if (id === 'retornoEntrega') renderizarRetornoEntrega();
+                 if (id === 'visualizarMotoristas') renderizarMotoristas();
+            } else {
+                 console.error("Seção não encontrada:", id);
+            }
+        }
+        function gerarIdUnico() { return Date.now().toString(36) + Math.random().toString(36).substring(2); }
+        function atualizarCategoriasSelect() {
+            fetch('/api/categorias')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('categoriaProduto');
+                    select.innerHTML = '<option value="">Selecione uma categoria existente</option>' + data.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                })
+                .catch(error => { console.error("Erro ao carregar categorias:", error); mostrarMensagem("Erro ao carregar categorias.", 'erro'); });
+        }
+        function adicionarCategoria() {
+            const novaCategoriaInput = document.getElementById('novaCategoria');
+            const novaCategoria = novaCategoriaInput.value.trim();
+            if (novaCategoria) {
+                fetch('/api/categorias', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ nome: novaCategoria }), })
+                .then(response => response.json())
+                .then(data => { if (data.mensagem.includes('adicionada')) { atualizarCategoriasSelect(); novaCategoriaInput.value = ''; mostrarMensagem(data.mensagem, 'sucesso'); } else { mostrarMensagem(data.mensagem, 'info'); } })
+                .catch(error => { console.error("Erro ao adicionar categoria:", error); mostrarMensagem("Erro ao adicionar categoria.", 'erro'); });
+            }
+             function limparFormularioProduto() { document.getElementById('produtoIdEditar').value = ''; document.getElementById('nomeProduto').value = ''; document.getElementById('quantidadeProduto').value = ''; document.getElementById('categoriaProduto').value = ''; document.getElementById('novaCategoria').value = ''; document.getElementById('nomeProduto').classList.remove('invalid'); document.getElementById('quantidadeProduto').classList.remove('invalid'); document.querySelector('#cadastroProduto h2').textContent = '➕ Cadastrar Novo Produto'; document.querySelector('#cadastroProduto .save-btn').textContent = '💾 Salvar Produto'; }
+            function salvarProduto() {
+                const id = document.getElementById('produtoIdEditar').value;
+                const nomeInput = document.getElementById('nomeProduto');
+                const quantidadeInput = document.getElementById('quantidadeProduto');
+                const categoriaSelect = document.getElementById('categoriaProduto');
+                const nome = nomeInput.value.trim();
+                const quantidadeStr = quantidadeInput.value;
+                const categoria = categoriaSelect.value;
+                let valido = true;
+                if (!nome) { nomeInput.classList.add('invalid'); valido = false; } else { nomeInput.classList.remove('invalid'); }
+                if (!quantidadeStr || isNaN(parseInt(quantidadeStr)) || parseInt(quantidadeStr) < 0) { quantidadeInput.classList.add('invalid'); valido = false; } else { quantidadeInput.classList.remove('invalid'); }
+                if (!valido) { mostrarMensagem('Por favor, preencha os campos obrigatórios (*) corretamente.', 'erro'); return; }
+                const quantidade = parseInt(quantidadeStr);
+                const data = { nome: nome, quantidade: quantidade, categoria: categoria };
+                const method = id ? 'PUT' : 'POST';
+                fetch('/api/produtos' + (id ? `/${id}` : ''), { method: method, headers: { 'Content-Type': 'application/json', }, body: JSON.stringify(data), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); limparFormularioProduto(); renderizarEstoque(); })
+                .catch(error => { console.error("Erro ao salvar produto:", error); mostrarMensagem("Erro ao salvar produto.", 'erro'); });
+            }
+            function editarProduto(id) {
+                const produto = JSON.parse(localStorage.getItem('produtos_v2'))?.find(p => p.id === id);
+                if (!produto) return;
+                document.getElementById('produtoIdEditar').value = produto.id;
+                document.getElementById('nomeProduto').value = produto.nome;
+                document.getElementById('quantidadeProduto').value = produto.quantidade;
+                document.getElementById('categoriaProduto').value = produto.categoria || '';
+                document.querySelector('#cadastroProduto h2').textContent = '✏️ Editar Produto';
+                document.querySelector('#cadastroProduto .save-btn').textContent = '💾 Atualizar Produto';
+                mostrarSecao('cadastroProduto');
+                window.scrollTo(0, 0);
+            }
+            function excluirProduto(id) {
+                if (confirm(`Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.`)) {
+                    fetch(`/api/produtos/${id}`, { method: 'DELETE', })
+                    .then(response => response.json())
+                    .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarEstoque(); renderizarPorCategoria(); renderizarResumoEstoque(); })
+                    .catch(error => { console.error("Erro ao excluir produto:", error); mostrarMensagem("Erro ao excluir produto.", 'erro'); });
+                }
+            }
+            function renderizarEntradaProdutos() {
+                fetch('/api/produtos')
+                    .then(response => response.json())
+                    .then(produtos => {
+                        const div = document.getElementById('listaProdutosEntrada');
+                        if (produtos.length === 0) { div.innerHTML = "<p>Nenhum produto cadastrado ainda. Cadastre produtos primeiro.</p>"; return; }
+                        div.innerHTML = produtos.map((produto) => `
+                            <div class="linha-entrada">
+                                <span style="flex: 1;">${produto.nome} (Estoque atual: ${produto.quantidade})</span>
+                                <input type="number" id="entrada_${produto.id}" placeholder="Qtd. Entrada" min="0" style="width: 100px;">
+                            </div>
+                        `).join('');
+                        const hoje = new Date().toISOString().split('T')[0];
+                        document.getElementById('dataEntradaGeral').value = hoje;
+                    })
+                    .catch(error => { console.error("Erro ao carregar produtos para entrada:", error); mostrarMensagem("Erro ao carregar produtos para entrada.", 'erro'); });
+            }
+            function salvarEntradas() {
+                const dataEntrada = document.getElementById('dataEntradaGeral').value;
+                if (!dataEntrada) { mostrarMensagem('Por favor, informe a data da entrada.', 'erro'); return; }
+                let entradas = [];
+                const inputsDeQuantidade = document.querySelectorAll('#listaProdutosEntrada input[id^="entrada_"]');
+                inputsDeQuantidade.forEach(input => {
+                    const id = input.id.split('_')[1];
+                    const qtdStr = input.value;
+                    if (qtdStr) { const qtd = parseInt(qtdStr); if (!isNaN(qtd) && qtd > 0) { entradas.push({ id: id, quantidade: qtd }); input.classList.remove('invalid'); } else if (qtd < 0) { mostrarMensagem(`Quantidade inválida para o produto com ID ${id}. Use apenas números positivos.`, 'erro'); input.classList.add('invalid'); return; } }
+                });
+                if (entradas.length === 0) { mostrarMensagem('Nenhuma quantidade de entrada foi informada.', 'info'); return; }
+                fetch('/api/entrada', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ dataEntrada: dataEntrada, entradas: entradas }), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarEntradaProdutos(); renderizarEstoque(); renderizarResumoEstoque(); })
+                .catch(error => { console.error("Erro ao salvar entradas:", error); mostrarMensagem("Erro ao salvar entradas.", 'erro'); });
+            }
+            function renderizarEstoque() {
+                fetch('/api/produtos')
+                    .then(response => response.json())
+                    .then(produtos => {
+                        const tabelaDiv = document.getElementById('tabelaEstoque');
+                        if (produtos.length === 0) { tabelaDiv.innerHTML = "<p>Nenhum produto no estoque.</p>"; return; }
+                        const tabelaHeader = `<table><thead><tr><th>Produto</th><th>Quantidade</th><th>Categoria</th><th>Ações</th></tr></thead><tbody>`;
+                        const tabelaBody = produtos.map((produto) => `
+                            <tr id="produto-row-${produto.id}">
+                                <td>${produto.nome}</td>
+                                <td>${produto.quantidade}</td>
+                                <td>${produto.categoria || 'N/A'}</td>
+                                <td>
+                                    <button class="edit-btn" onclick="editarProduto('${produto.id}')">✏️</button>
+                                    <button class="delete-btn" onclick="excluirProduto('${produto.id}')">🗑️</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                        const tabelaFooter = `</tbody></table>`;
+                        tabelaDiv.innerHTML = tabelaHeader + tabelaBody + tabelaFooter;
+                        filtrarProdutos();
+                    })
+                    .catch(error => { console.error("Erro ao carregar estoque:", error); mostrarMensagem("Erro ao carregar estoque.", 'erro'); });
+            }
+            function filtrarProdutos() {
+                const termo = document.getElementById('buscaProduto').value.toLowerCase();
+                const linhas = document.querySelectorAll('#tabelaEstoque tbody tr');
+                linhas.forEach(linha => {
+                    const nome = linha.cells[0].textContent.toLowerCase();
+                    const categoria = linha.cells[2].textContent.toLowerCase();
+                    const idProduto = linha.id.split('-')[2];
+                    const produtoEditando = document.getElementById('produtoIdEditar').value === idProduto;
+                    if (produtoEditando || nome.includes(termo) || categoria.includes(termo)) { linha.style.display = ''; } else { linha.style.display = 'none'; }
+                });
+            }
+            function renderizarPorCategoria() {
+                fetch('/api/produtos')
+                    .then(response => response.json())
+                    .then(produtos => {
+                        const div = document.getElementById('listaCategorias');
+                        const agrupado = produtos.reduce((acc, produto) => { const cat = produto.categoria || 'Sem Categoria'; if (!acc[cat]) acc[cat] = []; acc[cat].push(produto); return acc; }, {});
+                        if (Object.keys(agrupado).length === 0) { div.innerHTML = "<p>Nenhum produto cadastrado para agrupar por categoria.</p>"; return; }
+                        div.innerHTML = Object.entries(agrupado).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([categoria, itens]) => `
+                            <div class="categoria-box">
+                                <h3>${categoria} (${itens.reduce((sum, item) => sum + item.quantidade, 0)} itens)</h3>
+                                <table>
+                                    <thead><tr><th>Produto</th><th>Quantidade</th></tr></thead>
+                                    <tbody>
+                                    ${itens.sort((a, b) => a.nome.localeCompare(b.nome)).map(item => `
+                                        <tr>
+                                            <td>${item.nome}</td>
+                                            <td>${item.quantidade}</td>
+                                        </tr>
+                                    `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `).join('');
+                    })
+                    .catch(error => { console.error("Erro ao carregar produtos por categoria:", error); mostrarMensagem("Erro ao carregar produtos por categoria.", 'erro'); });
+            }
+            function cadastrarMotorista() {
+                const nomeInput = document.getElementById('nomeMotorista');
+                const telefoneInput = document.getElementById('telefoneMotorista');
+                const veiculoInput = document.getElementById('veiculoMotorista');
+                const nome = nomeInput.value.trim();
+                const telefone = telefoneInput.value.trim();
+                const veiculo = veiculoInput.value.trim();
+                if (!nome) { mostrarMensagem('O nome do motorista é obrigatório.', 'erro'); nomeInput.classList.add('invalid'); return; }
+                nomeInput.classList.remove('invalid');
+                fetch('/api/motoristas', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ nome: nome, telefone: telefone, veiculo: veiculo }), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); nomeInput.value = ''; telefoneInput.value = ''; veiculoInput.value = ''; renderizarMotoristas(); })
+                .catch(error => { console.error("Erro ao cadastrar motorista:", error); mostrarMensagem("Erro ao cadastrar motorista.", 'erro'); });
+            }
+            function renderizarMotoristas() {
+                fetch('/api/motoristas')
+                    .then(response => response.json())
+                    .then(motoristas => {
+                        const tabelaDiv = document.getElementById('tabelaMotoristas');
+                        if (motoristas.length === 0) { tabelaDiv.innerHTML = "<p>Nenhum motorista cadastrado.</p>"; return; }
+                        const tabelaHeader = `<table><thead><tr><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Ação</th></tr></thead><tbody>`;
+                        const tabelaBody = motoristas.map((motorista) => `
+                            <tr>
+                                <td>${motorista.nome}</td>
+                                <td>${motorista.telefone || 'N/A'}</td>
+                                <td>${motorista.veiculo || 'N/A'}</td>
+                                <td>
+                                    <button class="delete-btn" onclick="excluirMotorista('${motorista.id}')">🗑️ Excluir</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                        const tabelaFooter = `</tbody></table>`;
+                        tabelaDiv.innerHTML = tabelaHeader + tabelaBody + tabelaFooter;
+                    })
+                    .catch(error => { console.error("Erro ao carregar motoristas:", error); mostrarMensagem("Erro ao carregar motoristas.", 'erro'); });
+            }
+            function excluirMotorista(id) {
+                if (confirm(`Tem certeza que deseja excluir o motorista?`)) {
+                    fetch(`/api/motoristas/${id}`, { method: 'DELETE', })
+                    .then(response => response.json())
+                    .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarMotoristas(); })
+                    .catch(error => { console.error("Erro ao excluir motorista:", error); mostrarMensagem("Erro ao excluir motorista.", 'erro'); });
+                }
+            }
+            function renderizarResumoEstoque() {
+                fetch('/api/produtos')
+                    .then(response => response.json())
+                    .then(produtos => {
+                        const resumo = produtos.reduce((acc, produto) => { const cat = produto.categoria || 'Sem Categoria'; acc[cat] = (acc[cat] || 0) + produto.quantidade; return acc; }, {});
+                        const divResumo = document.getElementById('resumoEstoque');
+                        if (Object.keys(resumo).length === 0) { divResumo.innerHTML = "<p>Nenhum produto no estoque para exibir resumo.</p>"; return; }
+                        divResumo.innerHTML = Object.entries(resumo)
+                            .sort(([catA], [catB]) => catA.localeCompare(catB))
+                            .map(([cat, total]) => `<p style="font-size: 1.1em; margin: 10px 0;"><b>${cat}:</b> ${total} unidades</p>`)
+                            .join('');
+                        const totalGeral = produtos.reduce((sum, p) => sum + p.quantidade, 0);
+                        divResumo.innerHTML += `<hr><p style="font-size: 1.2em; font-weight: bold; margin-top: 15px;"><b>Total Geral:</b> ${totalGeral} unidades</p>`;
+                    })
+                    .catch(error => { console.error("Erro ao carregar resumo do estoque:", error); mostrarMensagem("Erro ao carregar resumo do estoque.", 'erro'); });
+            }
+            function renderizarSaidaEntrega() {
+                fetch('/api/motoristas')
+                    .then(response => response.json())
+                    .then(motoristas => {
+                        const selectMotorista = document.getElementById('motoristaSaida');
+                        selectMotorista.innerHTML = '<option value="">-- Selecione o Motorista * --</option>' + motoristas.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+                    })
+                    .catch(error => { console.error("Erro ao carregar motoristas para saída:", error); mostrarMensagem("Erro ao carregar motoristas.", 'erro'); });
+                fetch('/api/produtos')
+                    .then(response => response.json())
+                    .then(produtos => {
+                        const listaProdutosDiv = document.getElementById('listaProdutosSaida');
+                        const produtosDisponiveis = produtos.filter(p => p.quantidade > 0);
+                        if (produtosDisponiveis.length === 0) { listaProdutosDiv.innerHTML = "<p>Nenhum produto com estoque disponível para saída.</p>"; return; }
+                        listaProdutosDiv.innerHTML = produtosDisponiveis.map(produto => `
+                            <div class="linha-saida">
+                                <span>${produto.nome} (Disponível: ${produto.quantidade})</span>
+                                <input type="number" id="saida_${produto.id}" placeholder="Qtd." min="0" max="${produto.quantidade}">
+                            </div>
+                        `).join('');
+                        const hoje = new Date().toISOString().split('T')[0];
+                        document.getElementById('dataSaida').value = hoje;
+                    })
+                    .catch(error => { console.error("Erro ao carregar produtos para saída:", error); mostrarMensagem("Erro ao carregar produtos para saída.", 'erro'); });
+            }
+            function registrarSaidaEntrega() {
+                const dataSaida = document.getElementById('dataSaida').value;
+                const motoristaId = document.getElementById('motoristaSaida').value;
+                if (!dataSaida || !motoristaId) { mostrarMensagem('Data da Saída e Motorista são obrigatórios.', 'erro'); return; }
+                let itensSaida = [];
+                const inputsDeQuantidade = document.querySelectorAll('#listaProdutosSaida input[id^="saida_"]');
+                inputsDeQuantidade.forEach(input => {
+                    const id = input.id.split('_')[1];
+                    const qtdStr = input.value;
+                    if (qtdStr) { const qtd = parseInt(qtdStr); if (!isNaN(qtd) && qtd > 0) { itensSaida.push({ produto_id: id, quantidade: qtd }); input.classList.remove('invalid'); } else if (qtd < 0) { mostrarMensagem(`Quantidade inválida para o produto com ID ${id}. Use apenas números positivos.`, 'erro'); input.classList.add('invalid'); return; } }
+                });
+                if (itensSaida.length === 0) { mostrarMensagem('Nenhum produto/quantidade selecionado para a saída.', 'info'); return; }
+                fetch('/api/saida-entrega', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ dataSaida: dataSaida, motoristaId: motoristaId, itens: itensSaida }), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarSaidaEntrega(); renderizarEstoque(); renderizarControleEntregas(); })
+                .catch(error => { console.error("Erro ao registrar saída para entrega:", error); mostrarMensagem("Erro ao registrar saída para entrega.", 'erro'); });
+            }
+            function renderizarRetornoEntrega() {
+                fetch('/api/entregas?status=Em Rota,Retornado Parcial')
+                    .then(response => response.json())
+                    .then(entregasPendentes => {
+                        const divLista = document.getElementById('listaEntregasParaRetorno');
+                        if (entregasPendentes.length === 0) { divLista.innerHTML = "<p>Nenhuma entrega pendente de retorno no momento.</p>"; return; }
+                        divLista.innerHTML = entregasPendentes.map(entrega => `
+                            <div class="categoria-box">
+                                <h4>Entrega ID: ${entrega.id.substring(0, 6)}... (${entrega.status})</h4>
+                                <p><strong>Motorista:</strong> ${entrega.motoristaNome}</p>
+                                <p><strong>Data Saída:</strong> ${formatarData(entrega.dataSaida)}</p>
+                                <p><strong>Itens Enviados (Qtd Retornada até agora):</strong></p>
+                                ${entrega.itens.map(item => `
+                                    <div class="linha-retorno">
+                                        <span>${item.nome} (Saiu: ${item.qtdSaida}, Retornou: ${item.qtdRetornada})</span>
+                                        <input type="number" id="retorno_${entrega.id}_${item.produto_id}" placeholder="Qtd. Retorno">
+                                    </div>
+                                `).join('')}
+                                <button onclick="registrarRetorno('${entrega.id}')" class="save-btn">Registrar Retorno</button>
+                            </div>
+                        `).join('');
+                    })
+                    .catch(error => { console.error("Erro ao carregar entregas para retorno:", error); mostrarMensagem("Erro ao carregar entregas para retorno.", 'erro'); });
+            }
+            function registrarRetorno(entregaId) {
+                const inputsRetorno = document.querySelectorAll(`#listaEntregasParaRetorno input[id^="retorno_${entregaId}_"]`);
+                let itensRetornados = [];
+                let erro = false;
+                inputsRetorno.forEach(input => { const ids = input.id.split('_'); const produtoId = ids[2]; const qtdStr = input.value; if (qtdStr) { const qtd = parseInt(qtdStr); if (!isNaN(qtd) && qtd >= 0) { itensRetornados.push({ produto_id: produtoId, quantidade: qtd }); input.classList.remove('invalid'); } else { mostrarMensagem(`Quantidade de retorno inválida para o produto com ID ${produtoId}. Use apenas números positivos.`, 'erro'); input.classList.add('invalid'); erro = true; } } });
+                if (erro) return;
+                if (itensRetornados.length === 0) { mostrarMensagem('Nenhuma quantidade de retorno foi informada.', 'info'); return; }
+                fetch('/api/retorno-entrega', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ entregaId: entregaId, itensRetornados: itensRetornados }), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarRetornoEntrega(); renderizarEstoque(); renderizarControleEntregas(); })
+                .catch(error => { console.error("Erro ao registrar retorno de entrega:", error); mostrarMensagem("Erro ao registrar retorno de entrega.", 'erro'); });
+            }
+            function renderizarControleEntregas() {
+                fetch('/api/entregas')
+                    .then(response => response.json())
+                    .then(entregas => {
+                        const divLista = document.getElementById('listaControleEntregas');
+                        if (entregas.length === 0) { divLista.innerHTML = "<p>Nenhuma entrega registrada.</p>"; return; }
+                        divLista.innerHTML = entregas.map(entrega => `
+                            <div class="categoria-box">
+                                <h4>Entrega ID: ${entrega.id.substring(0, 6)}... (${entrega.status})</h4>
+                                <p><strong>Motorista:</strong> ${entrega.motoristaNome}</p>
+                                <p><strong>Data Saída:</strong> ${formatarData(entrega.dataSaida)}</p>
+                                <p><strong>Itens:</strong> ${entrega.itens.map(item => `${item.nome} (${item.qtdSaida})`).join(', ')}</p>
+                                <p><strong>Status:</strong> ${entrega.status}</p>
+                                ${entrega.dataRetorno ? `<p><strong>Data Retorno:</strong> ${formatarData(entrega.dataRetorno)}</p>` : ''}
+                                <button onclick="alterarStatusEntrega('${entrega.id}', 'Retornado Parcial')" class="edit-btn" style="font-size: 0.9em; margin-right: 5px;">Parcial</button>
+                                <button onclick="alterarStatusEntrega('${entrega.id}', 'Retornado Total')" class="save-btn" style="font-size: 0.9em; margin-right: 5px;">Total</button>
+                                <button onclick="alterarStatusEntrega('${entrega.id}', 'Problema')" class="delete-btn" style="font-size: 0.9em;">Problema</button>
+                            </div>
+                        `).join('');
+                    })
+                    .catch(error => { console.error("Erro ao carregar controle de entregas:", error); mostrarMensagem("Erro ao carregar controle de entregas.", 'erro'); });
+            }
+            function alterarStatusEntrega(id, status) {
+                fetch(`/api/entregas/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ status: status }), })
+                .then(response => response.json())
+                .then(data => { mostrarMensagem(data.mensagem, 'sucesso'); renderizarControleEntregas(); renderizarRetornoEntrega(); })
+                .catch(error => { console.error("Erro ao alterar status da entrega:", error); mostrarMensagem("Erro ao alterar status da entrega.", 'erro'); });
+            }
+            function formatarData(dataString) { if (!dataString) return 'N/A'; const data = new Date(dataString); const dia = String(data.getDate()).padStart(2, '0'); const mes = String(data.getMonth() + 1).padStart(2, '0'); const ano = data.getFullYear(); return `${dia}/${mes}/${ano}`; }
+            mostrarSecao('cadastroProduto');
+            atualizarCategoriasSelect();
+            renderizarEstoque();
+        </script>
+</body>
+</html>
